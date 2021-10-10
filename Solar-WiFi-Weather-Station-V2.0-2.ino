@@ -29,34 +29,25 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // configuration constants
-const bool bme280Debug = 0; // controls serial printing
+const bool bme280Debug = 1; // controls serial printing
 // set to 1 to enable printing of BME280 or BMP280 transactions
 
 // configure period between reports
 const long measurementInterval = 900000;  // 5mn measurement interval in ms
 
-// configuration control constant for use of either Blynk or Thingspeak
-//const String App = "BLYNK";         //  alternative is line below
 const String App = "Thingspeak"; //  alternative is line above
 
 #include <Wire.h>
-#include <farmerkeith_BMP280.h> // library, download from https://github.com/farmerkeith/BMP280-library
-#include <ESP8266WiFi.h>        // do we need this? Not when using Blynk
+#include <SPI.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+#include <ESP8266WiFi.h>
 #include <ArduinoOTA.h>
 
-#define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
-#include <BlynkSimpleEsp8266.h>
-
-
-bme280 bme0 (0, bme280Debug) ; // creates object bme0 of type bme280, base address
+Adafruit_BME280 bme0; // I2C
 
 // unsigned long eventCounter = 0; // to count measurement events
 
-// You should get Auth Token in the Blynk App.
-// Go to the Project Settings (nut icon).
-char auth[] = "f95037bcf01142a7b5618fb2fe66a48a"; // copy it from the mail received from Blynk
-// Your WiFi credentials.
-// Set password to "" for open networks.
 char ssid[] = "obo-ap-rpi"; // WiFi Router ssid
 char pass[] = "rpiObomai232Obomai232"; // WiFi Router password
 // Thingspeak Write API
@@ -64,7 +55,6 @@ const char* server = "api.thingspeak.com";
 const char* api_key = "6OE6DSG9XRY6LDW2"; // API write key
 
 #include "PTHsleep.h" // tab file
-
 
 void setup() {
 	int count=0;
@@ -74,13 +64,7 @@ void setup() {
 
 	Serial.println("\nStart of solarWiFiWeatherStationESP_12th Feb2019");
 
-	// **************Choose Application**********************************
-
-	if (App == "BLYNK")  // for posting datas to Blynk App
-	{
-		Blynk.begin(auth, ssid, pass);
-	}
-	else if (App == "Thingspeak")  // for posting datas to Thingspeak website
+	if (App == "Thingspeak")  // for posting datas to Thingspeak website
 	{
 		Serial.print("\nWIFI trying to connect ");
 		WiFi.begin(ssid, pass);
@@ -105,29 +89,16 @@ void setup() {
 		Serial.println(" is not a valid application");
 	}
 
-	// bme0.updateF4Control16xSleep(); // use instead of saveCounter if counter is not required
-
-	bme0.updateF4Control(7,7,1);  // forced mode
-	//*******************************************************************
-	unsigned long baseEventTime = millis();
-
-	//  eventCounter = recoverCounter();         // comment out if counter is not required
-	byte temperatureSamples = pow(2, osrs_t - 1);
-	byte pressureSamples = pow(2, osrs_p - 1);
-	byte humiditySamples = pow(2, osrs_h - 1);
-	Serial.print ("Temperature samples=");
-	Serial.print (temperatureSamples);
-	Serial.print (" Pressure samples=");
-	Serial.print (pressureSamples);
-	Serial.print (" Humidity samples=");
-	Serial.println (humiditySamples);
-
-	// Wire.begin(); // initialise I2C protocol - not needed here since it is in bmp library
-	bme0.begin(osrs_t, osrs_p, 1, 0, 0, 0, osrs_h);
-	// parameters are (osrs_t, osrs_p, mode, t_sb, filter, spi3W_en, osrs_h)
-	// see BME280 data sheet for definitions
-	// this is single shot mode with no filtering
-	bme0.updateF4Control(7,7,1);  // forced mode
+  //if (!bme0.begin(0x76, 0x60)) {
+   if (!bme0.begin(0x76)) {
+        Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
+        Serial.print("SensorID was: 0x"); Serial.println(bme0.sensorID(),16);
+        Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
+        Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
+        Serial.print("        ID of 0x60 represents a BME 280.\n");
+        Serial.print("        ID of 0x61 represents a BME 680.\n");
+    while (1) delay(10);
+  }
 
 	measurementEvent();
 	//  eventCounter ++;
